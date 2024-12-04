@@ -1,14 +1,18 @@
-assume cs:code,ds:data,ss:stack
+assume cs:code,ds:datasg
+
+datasg segment
+    num db 12 dup(0)
+
+datasg ends
 
 code segment
-    dw 0123h,0456h,0789h
-start:  mov ax,0
-        mov bx,0
-        mov cx,3
-    s:  add ax,cs:[bx]
-        add bx,2
-        loop s
-        mov ax,4c00h ;完成函数，返回
-        int 21h
+start:
+    mov ax,datasg 
+    mov ds,ax  
+    
+    mov ax,0fffh
+    mov [num],ax
+
+    mov bx,0
 code ends
 end start
