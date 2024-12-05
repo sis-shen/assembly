@@ -10,12 +10,20 @@ datasg segment
     enter db 13, 10,'$'
     num1 dw 6 dup(0)
     num2 dw 6 dup(0)
+
+    numlen dw 0 ;储存余数
+
+    tmpcx1 dw 0
+    tmpcx2 dw 0
+
 datasg ends  
 
 ;初始化栈段，置空
 stacksg segment
     db 25565 dup(0)
 stacksg ends  
+
+
 
 codesg segment
 start:  
@@ -32,9 +40,6 @@ setZero:
     mov [num2+bx],0
     add bx,2    ;偏移量增加
     loop setZero
-
-    ;debug
-    mov [num2],1
 
     ;打印输入
     mov ah,09h
@@ -57,11 +62,18 @@ setZero:
 
     ; call Fib
 
+    ; ;debug
+    mov ax,999
+    mov [num2],ax
+    mov ax,1
+    ; mov [num2+2],ax
+    mov [num2+4],ax
+
     mov ah,09h
     lea dx,result
     int 21h
 
-    call FibOutput
+    call LongNumPrint
 
     mov ah,09h
     lea dx,enter;打印回车
@@ -131,6 +143,10 @@ FibBaseRet:
     ret 
     
 ;================数字键入模块============
+FarProcExit:
+    jmp far ptr ProcExit
+    ret
+
 InputNum:
     ;现状保存,除了ax要输出参数
     ;设计为传值传参，所以要保存bx~dx
@@ -145,7 +161,7 @@ InputLoop:
     int 21h
     ;判断是否为字符Q,为Q则退出程序
     cmp al,'Q'
-    je ProcExit
+    je FarProcExit
     ;非法字符判断，包括回车时结束输入
     cmp al,'0' ;和字符'0'比较
     jb InputNumEnd  ;jb用于比小，当al < '0'小时跳转
@@ -206,20 +222,75 @@ PrintNumStr:
 
 ;========Fib数字输出模块=====
 ;要先打印高位,答案在num2
+LongNumPrintZero:
+    mov dx,'0'    ;打印0
+    mov ah,02h;打印字符指令
+    int 21h     ;开启中断
+    ret
+
 LongNumPrint:
-    mov bx,10   ;记录除数
-    mov cx,0    ;记录打印次数
+    mov ax,0
+    mov [numlen],ax  ;numlen储存输出长度
+    call isLongZero ;判0
+    cmp ax,1    ;为0时直接打印0
+    jz LongNumPrintZero
+
+    mov si,0  ;存储偏移量
+    mov cx,6 ;6个字
 LongParseLoop:
-    mov si,0    ;记录偏移量
-    push cx ;暂存cx
-;循环遍历一次取模操作
-LongModeLoop:
-    mov ax,[num2+si]    ;打印一次高位数字
-    call PrintNum
-    sub si,2;
-    loop FibOutputLoop
+    call isLongZero
+    cmp ax,1  
+    jz LongNumPrintOutput   ;为0则停止分析,开始打印输出
+
+    mov [tmpcx1],cx ;暂存cx
+    mov cx,3   ;每个单元最多存储999,所以要固定打印3位数字
+ThreeLoop:
+    call isLongZero
+    cmp ax,1    ;判断是否为0
+    jnz ThreeLoopStart  ;不为零则进入循环
+    ;循环出口
+    ;为0则处理一下
+    mov cx,[tmpcx1] ;取回栈里的cx
+    jmp LongNumPrintOutput
+ThreeLoopStart:
+    add [numlen],1
+
+    mov ax,[num2+si]
+    cmp ax,0 
+    jz ThreeLoopZero    ;分流
+    ; jmp ThreeLoopZero ;debug
+
+    mov dx,0
+    mov bx,10
+    div bx
+    mov [num2+si],ax    ;写回内存
+    add dx,'0'  ;转换为字符
+    push dx
+    loop ThreeLoopStart
+
+    mov cx,[tmpcx1]
+    add si,2 ;增加偏移量
+    loop LongParseLoop
+
+ThreeLoopZero:
+    mov dx,'0'
+    push dx
+    loop ThreeLoopStart
+
+    mov cx,[tmpcx1]
+    add si,2 ;增加偏移量
+    loop LongParseLoop
+
+LongNumPrintOutput:
+    mov cx,[numlen] ;取出数字长度
+LongNumPrintOutputLoop:
+    pop dx    ;出栈
+    mov ah,02h;打印字符指令
+    int 21h     ;开启中断
+    loop LongNumPrintOutputLoop
 
     ret
+
 
 ;========判空模块==========
 isLongZero:

@@ -36,3 +36,28 @@ FibBaseRet:
 
 
 原因：瞎用`ret 2`导致栈空间使用紊乱，程序乱跳转
+
+
+4. `div`的使用规则不清楚,求`ax`的余数时，没有给高`16`位的`dx`置零
+
+```
+;错误代码
+    mov ax,[mo]  ;取出总模数
+    mov bx,10
+    div bx      ;求余数
+    add dx,'0'  ;转换成字符
+
+;正确代码
+    mov dx,0    ;高16位置0
+    mov ax,[mo]  ;取出总模数
+    mov bx,10
+    div bx      ;求余数
+    add dx,'0'  ;转换成字符
+```
+
+错误输出
+
+![](https://picbed0521.oss-cn-shanghai.aliyuncs.com/blogpic/202412051415008.webp)
+
+预期输出
+![](https://picbed0521.oss-cn-shanghai.aliyuncs.com/blogpic/202412051415492.webp)
