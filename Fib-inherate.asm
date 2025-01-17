@@ -2,19 +2,17 @@ assume cs:codesg,ds:datasg,ss:stacksg
 
 ;初始化数据段，并填入数字
 datasg segment
-    num dw 10h ;选择斐波那契数列的第num个数
     choose db 'Please choose a num from 1 to 100 : ','$'
     result db 'The result is : ','$'
     pressQ db 'Presss Q to exit','$'
-    wrongRange db 'wrong range, try again'
+    wrongRange db 'wrong range, try again','$'
     enter db 13, 10,'$'
     num1 dw 6 dup(0)
     num2 dw 6 dup(0)
 
-    numlen dw 0 ;储存余数
+    numlen dw 0 ;储存输出长度
 
     tmpcx1 dw 0
-    tmpcx2 dw 0
 
 datasg ends  
 
@@ -35,71 +33,66 @@ start:
 
     mov cx,6    ;12字节长度循环6次
     mov bx,0    ;bx计算偏移量
+    ;将num1和num2的所有字节都置为零
 setZero:
     mov [num1+bx],0
     mov [num2+bx],0
     add bx,2    ;偏移量增加
     loop setZero
 
-    ;打印输入
+    ;打印输入提示信息
     mov ah,09h
     lea dx,choose 
     int 21h
 
     ;获取输入,并存到ax里
     call InputNum
-    push ax     
+    push ax     ;暂存ax
 
     mov ah,09h
     lea dx,enter;打印回车
     int 21h
 
-    pop ax
+    pop ax      ;取出ax
     cmp ax,0    ;判断是否为0
     je ProcWrongRange
     cmp ax,99 ;判断是否比100大
     ja ProcWrongRange
 
-    ; call Fib
 
-    ; ;debug
-    mov ax,999
-    mov [num2],ax
-    mov ax,1
-    ; mov [num2+2],ax
-    mov [num2+4],ax
+    call Fib    ;调用斐波那契数列迭代计算模块，结果存在num2里
 
     mov ah,09h
-    lea dx,result
+    lea dx,result   ;输出答案提示信息
     int 21h
 
-    call LongNumPrint
+    call LongNumPrint   ;调用超长整数输出模块
 
     mov ah,09h
     lea dx,enter;打印回车
     int 21h
 
     mov ah,09h
-    lea dx,pressQ
+    lea dx,pressQ   ;提示退出信息
     int 21h
 
     mov ah,09h
     lea dx,enter;打印回车
     int 21h
 
-    jmp start ;改成循环，循环的退出在字符输入模块内
+    jmp start ;使用jmp形成死循环,程序正在的出口在数字输入模块里
 
 ProcWrongRange:
     mov ah,09h
-    lea dx,wrongRange
+    lea dx,wrongRange   ;输出范围错误提示信息
     int 21h
 
     mov ah,09h
     lea dx,enter;打印回车
     int 21h
 
-    jmp start
-;===========斐波那契数列递归模块========规定用堆栈输出
+    jmp start   ;利用jmp形成死循环
+;===========斐波那契数列迭代模块========规定用num2输出
 Fib:
     cmp ax,3 ;ax <3 ，或者说 ax <= 2时
     jb FibBaseRet
@@ -109,17 +102,26 @@ Fib:
     mov dx,0    ;储存进位
     mov ax,0
     mov bx,1
+    mov [num1],ax   ;存入初始值
+    mov [num2],bx
 FibLoop:
     push cx ;暂存最外部的循环
     ;内层循环初始化
     mov si,0    ;储存偏移量
     mov cx,6    ;开始逐段相加和交换
-    CLC;把CF置零
 FibInnerLoop:
     mov ax,[num1+si];//从低位到高位取出一段数据
     mov bx,[num2+si];
-    adc ax,bx   ;计算相加
+    add ax,bx   ;计算相加
 
+    cmp ax,9999
+    ja  FibCB
+FibNoneCB:
+    jmp FIBExchange
+FibCB:
+    sub ax,10000 ;减去1000
+    add [num1+si+2],1   ;加上进位，因为num2+si+2要用于下次的赋值，所以不能加在上面
+FIBExchange:
     ;交换ax,bx
     push ax
     push bx
@@ -144,7 +146,7 @@ FibBaseRet:
     
 ;================数字键入模块============
 FarProcExit:
-    jmp far ptr ProcExit
+    jmp far ptr ProcExit    ;远距离跳转
     ret
 
 InputNum:
@@ -188,37 +190,6 @@ InputNumEnd:
     pop bx;
     ret    ;函数返回
 
-;==============数字打印模块=============
-PrintNum:
-    ;现状保存
-    push ax   ;设计为传值传参，所以要保存ax~dx
-    push bx  
-    push cx  
-    push dx  
-    ;初始化
-    mov bx,10  ;这个bx存了除数10
-    mov cx,0  ;cx用于记录数字位数/循环次数
-
-ParseLoop:  ;解析数字串
-    mov dx,0  ;dx置零
-    div bx   ;ax/10取余数在dx中
-    add dx,30h;转换成数字字符
-    push dx  ;将余数压栈（正好最后一个数字先压栈，后出栈）
-    inc cx   ;增加打印计数
-    cmp ax,0 ;判断ax是否为0
-    jnz ParseLoop   ;循环调用
-
-PrintNumStr:
-    pop dx    ;出栈
-    mov ah,02h;打印字符指令
-    int 21h     ;开启中断
-    loop PrintNumStr
-
-    pop dx; 恢复现场
-    pop cx;
-    pop bx;
-    pop ax;
-    ret    ;函数返回
 
 ;========Fib数字输出模块=====
 ;要先打印高位,答案在num2
@@ -243,39 +214,33 @@ LongParseLoop:
     jz LongNumPrintOutput   ;为0则停止分析,开始打印输出
 
     mov [tmpcx1],cx ;暂存cx
-    mov cx,3   ;每个单元最多存储999,所以要固定打印3位数字
-ThreeLoop:
+    mov cx,4   ;每个单元最多存储9999,所以要固定打印3位数字
+FourLoop:
     call isLongZero
     cmp ax,1    ;判断是否为0
-    jnz ThreeLoopStart  ;不为零则进入循环
+    jnz FourLoopStart  ;不为零则进入循环
     ;循环出口
-    ;为0则处理一下
-    mov cx,[tmpcx1] ;取回栈里的cx
+    ;为0则不管外层cx，直接前去打印
     jmp LongNumPrintOutput
-ThreeLoopStart:
+FourLoopStart:
     add [numlen],1
 
     mov ax,[num2+si]
     cmp ax,0 
-    jz ThreeLoopZero    ;分流
-    ; jmp ThreeLoopZero ;debug
+    jz FourLoopZero    ;分流
 
     mov dx,0
     mov bx,10
     div bx
     mov [num2+si],ax    ;写回内存
     add dx,'0'  ;转换为字符
-    push dx
-    loop ThreeLoopStart
+    jmp FourLoopAdd
 
-    mov cx,[tmpcx1]
-    add si,2 ;增加偏移量
-    loop LongParseLoop
-
-ThreeLoopZero:
+FourLoopZero:
     mov dx,'0'
+FourLoopAdd:
     push dx
-    loop ThreeLoopStart
+    loop FourLoop
 
     mov cx,[tmpcx1]
     add si,2 ;增加偏移量
@@ -295,6 +260,7 @@ LongNumPrintOutputLoop:
 ;========判空模块==========
 isLongZero:
     push cx
+    push si
     mov cx,6  ;循环6次
     mov si,0
 isLongZeroLoop:
@@ -305,10 +271,12 @@ isLongZeroLoop:
     loop isLongZeroLoop
 
 ZeorTrue:
+    pop si
     pop cx
     mov ax,1
     ret
 ZeroFalse:
+    pop si
     pop cx
     mov ax,0
     ret

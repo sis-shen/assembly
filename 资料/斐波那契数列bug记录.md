@@ -61,3 +61,22 @@ FibBaseRet:
 
 预期输出
 ![](https://picbed0521.oss-cn-shanghai.aliyuncs.com/blogpic/202412051415492.webp)
+
+
+5. 不同的模块公用一个`si`，却**没有做隔离**，导致了一个奇怪的`bug`---每一块数字只要`全为0`就不会打印，而只要有一位不为零就会正常打印
+
+```
+;初始化代码
+    mov ax,1
+    mov [num2],ax
+    mov ax,0
+    mov [num2+2],ax
+    mov ax,909
+    mov [num2+4],ax
+
+;预期输出
+909000001
+
+;实际输出
+909001
+```

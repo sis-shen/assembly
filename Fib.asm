@@ -6,7 +6,7 @@ datasg segment
     choose db 'Please choose a num from 1 to 100 : ','$'
     result db 'The result is : ','$'
     pressQ db 'Presss Q to exit','$'
-    wrongRange db 'wrong range, try again'
+    wrongRange db 'wrong range, try again','$'
     enter db 13, 10,'$'
 datasg ends  
 
